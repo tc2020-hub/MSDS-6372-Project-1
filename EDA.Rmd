@@ -1,0 +1,27 @@
+---
+title: "EDA"
+author: "mweather"
+date: "5/29/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+# Install/Import Packages
+
+
+
+```
+
+```{r}
+# Import Data Sets
+moddata = read.csv("modelingData.csv", header = TRUE)
+projdata = read.csv("projectionData.csv", header = TRUE)
+
+head(moddata)
+head(projdata)
+```
+
