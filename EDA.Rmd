@@ -11,7 +11,9 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{r Package Mang, echo=FALSE}
 # Install/Import Packages
+install.packages("naniar")
 
+library(naniar)
 
 
 ```
@@ -20,9 +22,6 @@ knitr::opts_chunk$set(echo = TRUE)
 # Import Data Sets
 moddata = read.csv("modelingData.csv", header = TRUE)
 projdata = read.csv("projectionData.csv", header = TRUE)
-
-head(moddata)
-head(projdata)
 ```
 
 Data Cleaning and Wrangling
@@ -42,6 +41,11 @@ Exploratory Data Analysis
 ```{r Miss Value, echo=FALSE}
 # Missing value identification, summary and possible imputation (mean, median, regression.) This may also be considered part of “Data Wrangling”.
 
+#Create plots to analyize missing data
+gg_miss_var(moddata)
+vis_miss(moddata, warn_large_data = FALSE)
+gg_miss_var(projdata)
+vis_miss(projdata, warn_large_data = FALSE)
 ```
 
 ```{r Multicollinearity, echo=FALSE}
