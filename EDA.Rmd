@@ -1,0 +1,82 @@
+---
+title: "EDA"
+author: "mweather"
+date: "5/29/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r Package Mang, echo=FALSE}
+# Install/Import Packages
+install.packages("naniar")
+
+library(naniar)
+
+
+```
+
+```{r Import, echo=FALSE}
+# Import Data Sets
+moddata = read.csv("modelingData.csv", header = TRUE)
+projdata = read.csv("projectionData.csv", header = TRUE)
+```
+
+Data Cleaning and Wrangling
+
+```{r Data Wrangling, echo=FALSE}
+# Data Cleaning / Wrangling (any renaming of variables or standardizing of values.)
+
+```
+
+Exploratory Data Analysis
+
+```{r Outlier, echo=FALSE}
+# Outlier Identification and Handling
+
+```
+
+```{r Miss Value, echo=FALSE}
+# Missing value identification, summary and possible imputation (mean, median, regression.) This may also be considered part of “Data Wrangling”.
+
+#Create plots to analyize missing data
+gg_miss_var(moddata)
+vis_miss(moddata, warn_large_data = FALSE)
+gg_miss_var(projdata)
+vis_miss(projdata, warn_large_data = FALSE)
+```
+
+```{r Multicollinearity, echo=FALSE}
+# Multicollinearity (is there reason to believe it is present?)  You don’t have to address every potential pair of variables that may be collinear.  Just provide a plot and or other evidence of a single occurrence of multicollinearity if at least one exists and then mention possible other occurrences.  
+
+```
+
+```{r Assumptions, echo=FALSE}
+# Homoscedasticity, normal distributions of the response for fixed values of the explanatory variable(s), linear relationship between the mean of the response and each explanatory variable, etc.  This is where you would apply transformations (log, square root, etc.)
+
+```
+
+```{r Variable Selection, echo=FALSE}
+# Variable selection: For example, there are many potential explanatory variables. Running stepwise variable selection will not necessarily provide a final model, but may leave you with a smaller set of potential explanatory variables to work with.
+
+```
+
+```{r Miscellaneous, echo=FALSE}
+# Anything else that might be appropriate in learning about the data before getting started.  (Example: You might analyze interactions between explanatory variables in the analysis.)
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
