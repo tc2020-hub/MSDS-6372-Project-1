@@ -1,6 +1,6 @@
 ---
 title: "EDA"
-author: "mweather"
+author: "Team_1"
 date: "5/29/2020"
 output: html_document
 ---
@@ -14,7 +14,10 @@ knitr::opts_chunk$set(echo = TRUE)
 install.packages("naniar")
 
 library(naniar)
-
+library(ggplot2)
+library(corrplot)
+library(dplyr)
+library(caret)
 
 ```
 
@@ -48,8 +51,29 @@ gg_miss_var(projdata)
 vis_miss(projdata, warn_large_data = FALSE)
 ```
 
+```{r}
+
+############################################
+#Address missing values in each column
+############################################
+#missing values
+
+
+```
+
 ```{r Multicollinearity, echo=FALSE}
 # Multicollinearity (is there reason to believe it is present?)  You don’t have to address every potential pair of variables that may be collinear.  Just provide a plot and or other evidence of a single occurrence of multicollinearity if at least one exists and then mention possible other occurrences.  
+
+#Return numeric values only
+df_numeric <- moddata[, sapply(moddata, is.numeric)]
+
+#Correlation Plot
+df_numeric[is.na(df_numeric)] <- "0"
+df_numeric <- df_numeric[, sapply(df_numeric, is.numeric)]
+df_corr <- round(cor(df_numeric),2)
+
+corrplot(cor(df_corr), diag = FALSE, order = "FPC",
+         tl.pos = "td", tl.cex = 0.5, method = "color", type = "upper")
 
 ```
 
