@@ -1,8 +1,8 @@
 ---
 title: "EDA"
-author: "mweather"
+author: "Team_1"
 date: "5/29/2020"
-output: html_document
+output: html_document 
 ---
 
 ```{r setup, include=FALSE}
@@ -14,7 +14,13 @@ knitr::opts_chunk$set(echo = TRUE)
 install.packages("naniar")
 
 library(naniar)
-
+library(ggplot2)
+library(corrplot)
+library(dplyr)
+library(caret)
+library(funModeling)
+library(tidyverse) 
+library(Hmisc)
 
 ```
 
@@ -48,8 +54,80 @@ gg_miss_var(projdata)
 vis_miss(projdata, warn_large_data = FALSE)
 ```
 
+```{r}
+
+############################################
+#Address missing values in each column
+############################################
+#missing values
+# create new dataset without missing data
+newdata <- na.omit(moddata)
+
+
+```
+
+```{r}
+
+############################################
+#basic plots to analyize data
+############################################
+
+
+# Plot to show the count by Product_type (Investment vs OwnerOccupie)
+prodCount <- moddata %>%
+  group_by(product_type) %>%
+  summarise(counts = n())
+
+ggplot(prodCount, aes(x = product_type, y = counts)) +
+  geom_bar(fill = "#0073C2FF", stat = "identity") +
+  geom_text(aes(label = counts), vjust = -0.3) + 
+  theme_grey()
+
+#PLot Price_doc vs full_sq
+ggplot(aes(x=full_sq, y=price_doc), data=moddata) + 
+    geom_point(color='blue')
+
+# price_doc is right skwed we can 
+ggplot(moddata,aes(x=price_doc))+geom_density(fill="blue",alpha=0.6)
+moddata['log_price_doc'] = log(moddata$price_doc)
+ggplot(moddata,aes(x=log_price_doc))+geom_density(fill="blue",alpha=0.6)
+
+# % of missed data by features
+miss_pct <- map_dbl(moddata, function(x) { round((sum(is.na(x)) / length(x)) * 100, 1) })
+miss_pct <- miss_pct[miss_pct > 0]
+data.frame(miss=miss_pct, var=names(miss_pct), row.names=NULL) %>%
+    ggplot(aes(x=reorder(var, -miss), y=miss)) + 
+    geom_bar(stat='identity', fill='blue') +
+    labs(x='', y='% missing', title='Percent missing data by feature') +
+    theme(axis.text.x=element_text(angle=90, hjust=1))
+
+# Histogram showing build year distribution
+moddata %>% 
+    filter(build_year > 1940 & build_year < 2018) %>%
+    ggplot(aes(x=build_year)) + 
+    geom_histogram(fill='blue') + 
+    ggtitle('Distribution of build year')
+
+table(moddata$build_year)
+
+
+str(moddata) 
+
+```
+
 ```{r Multicollinearity, echo=FALSE}
 # Multicollinearity (is there reason to believe it is present?)  You don’t have to address every potential pair of variables that may be collinear.  Just provide a plot and or other evidence of a single occurrence of multicollinearity if at least one exists and then mention possible other occurrences.  
+
+#Return numeric values only
+df_numeric <- moddata[, sapply(moddata, is.numeric)]
+
+#Correlation Plot
+df_numeric[is.na(df_numeric)] <- "0"
+df_numeric <- df_numeric[, sapply(df_numeric, is.numeric)]
+df_corr <- round(cor(df_numeric),2)
+
+corrplot(cor(df_corr), diag = FALSE, order = "FPC",
+         tl.pos = "td", tl.cex = 0.5, method = "color", type = "upper")
 
 ```
 
