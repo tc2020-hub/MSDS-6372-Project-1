@@ -4,3 +4,5 @@
 
 newprojection <- na.omit(projectio)
 newmodeling <-na.omit(modelingData)
+
+#Check for correlations
