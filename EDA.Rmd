@@ -146,7 +146,44 @@ corrplot(cor(df_corr), diag = FALSE, order = "FPC",
 
 ```
 
+```{r LM of independent variables, echo=FALSE}
+Indepadj<-lm(formula = logprice~full_sq+life_sq+floor+raion_popul+green_zone_part+indust_part+children_preschool+preschool_quota+children_school+hospital_beds_raion+
+               metro_min_avto+metro_km_avto+metro_min_walk+metro_km_walk+school_km+park_km+green_zone_km+industrial_km+railroad_station_walk_km, data = newmodeling
+               )
+Residuals:
+     Min       1Q   Median       3Q      Max 
+-0.72226 -0.04661  0.00000  0.07110  0.63828 
 
+Coefficients: (1 not defined because of singularities)
+                           Estimate Std. Error t value Pr(>|t|)  
+(Intercept)               3.170e+01  9.953e+01   0.319   0.7538  
+full_sq                   6.517e-03  3.499e-03   1.863   0.0789 .
+life_sq                  -4.156e-03  2.998e-03  -1.386   0.1825  
+floor                     9.257e-03  1.205e-02   0.768   0.4524  
+raion_popul              -7.596e-04  4.453e-03  -0.171   0.8664  
+green_zone_part           5.420e+00  6.126e+01   0.088   0.9305  
+indust_part              -4.853e+01  3.284e+02  -0.148   0.8842  
+children_preschool        1.760e-02  1.042e-01   0.169   0.8678  
+preschool_quota          -5.385e-03  3.201e-02  -0.168   0.8683  
+children_school          -3.873e-03  2.317e-02  -0.167   0.8691  
+hospital_beds_raion      -1.219e-03  8.434e-03  -0.144   0.8867  
+metro_min_avto            3.983e-01  2.888e+00   0.138   0.8918  
+metro_km_avto             3.371e-01  5.491e+00   0.061   0.9517  
+metro_min_walk           -2.788e-02  4.202e-02  -0.663   0.5155  
+metro_km_walk                    NA         NA      NA       NA  
+school_km                -1.387e-01  4.980e+00  -0.028   0.9781  
+park_km                  -2.985e-01  7.404e-01  -0.403   0.6916  
+green_zone_km             1.112e+00  2.778e+00   0.400   0.6935  
+industrial_km             1.376e+00  3.996e+00   0.344   0.7346  
+railroad_station_walk_km -7.090e-01  2.066e+00  -0.343   0.7354  
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+Residual standard error: 0.327 on 18 degrees of freedom
+Multiple R-squared:  0.7698,	Adjusted R-squared:  0.5395 
+F-statistic: 3.343 on 18 and 18 DF,  p-value: 0.007043
+
+```
 
 
 
