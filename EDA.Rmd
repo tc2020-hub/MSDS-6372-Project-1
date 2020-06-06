@@ -12,6 +12,8 @@ knitr::opts_chunk$set(echo = TRUE)
 ```{r Package Mang, echo=FALSE}
 # Install/Import Packages
 install.packages("naniar")
+install.packages("glmnet")
+install.packages("mltools")
 
 library(naniar)
 library(ggplot2)
@@ -21,6 +23,14 @@ library(caret)
 library(funModeling)
 library(tidyverse) 
 library(Hmisc)
+library(randomForest)
+library(glmnet)
+
+library(data.table)
+library(Matrix)
+library(caret)
+
+library(mltools)
 
 ```
 
@@ -61,7 +71,7 @@ vis_miss(projdata, warn_large_data = FALSE)
 ############################################
 #missing values
 # create new dataset without missing data
-newdata <- na.omit(moddata)
+moddata <- na.omit(moddata)
 
 
 ```
@@ -87,10 +97,6 @@ ggplot(prodCount, aes(x = product_type, y = counts)) +
 ggplot(aes(x=full_sq, y=price_doc), data=moddata) + 
     geom_point(color='blue')
 
-# price_doc is right skwed we can 
-ggplot(moddata,aes(x=price_doc))+geom_density(fill="blue",alpha=0.6)
-moddata['log_price_doc'] = log(moddata$price_doc)
-ggplot(moddata,aes(x=log_price_doc))+geom_density(fill="blue",alpha=0.6)
 
 # % of missed data by features
 miss_pct <- map_dbl(moddata, function(x) { round((sum(is.na(x)) / length(x)) * 100, 1) })
@@ -109,6 +115,16 @@ moddata %>%
     ggtitle('Distribution of build year')
 
 table(moddata$build_year)
+
+# Date features
+ts1 = as.Date(timestamp)
+data[,":="(date_yday=yday(timestamp)
+           ,date_month=month(timestamp)
+           ,date_year=year(timestamp)
+           ,date_week=week(timestamp)
+           ,date_mday=mday(timestamp)
+           ,date_wday=wday(timestamp)
+)]
 
 
 str(moddata) 
@@ -146,44 +162,119 @@ corrplot(cor(df_corr), diag = FALSE, order = "FPC",
 
 ```
 
-```{r LM of independent variables, echo=FALSE}
-Indepadj<-lm(formula = logprice~full_sq+life_sq+floor+raion_popul+green_zone_part+indust_part+children_preschool+preschool_quota+children_school+hospital_beds_raion+
-               metro_min_avto+metro_km_avto+metro_min_walk+metro_km_walk+school_km+park_km+green_zone_km+industrial_km+railroad_station_walk_km, data = newmodeling
-               )
-Residuals:
-     Min       1Q   Median       3Q      Max 
--0.72226 -0.04661  0.00000  0.07110  0.63828 
+```{r Model building, echo=FALSE}
+# Model using Stepwise Elimination Process)
 
-Coefficients: (1 not defined because of singularities)
-                           Estimate Std. Error t value Pr(>|t|)  
-(Intercept)               3.170e+01  9.953e+01   0.319   0.7538  
-full_sq                   6.517e-03  3.499e-03   1.863   0.0789 .
-life_sq                  -4.156e-03  2.998e-03  -1.386   0.1825  
-floor                     9.257e-03  1.205e-02   0.768   0.4524  
-raion_popul              -7.596e-04  4.453e-03  -0.171   0.8664  
-green_zone_part           5.420e+00  6.126e+01   0.088   0.9305  
-indust_part              -4.853e+01  3.284e+02  -0.148   0.8842  
-children_preschool        1.760e-02  1.042e-01   0.169   0.8678  
-preschool_quota          -5.385e-03  3.201e-02  -0.168   0.8683  
-children_school          -3.873e-03  2.317e-02  -0.167   0.8691  
-hospital_beds_raion      -1.219e-03  8.434e-03  -0.144   0.8867  
-metro_min_avto            3.983e-01  2.888e+00   0.138   0.8918  
-metro_km_avto             3.371e-01  5.491e+00   0.061   0.9517  
-metro_min_walk           -2.788e-02  4.202e-02  -0.663   0.5155  
-metro_km_walk                    NA         NA      NA       NA  
-school_km                -1.387e-01  4.980e+00  -0.028   0.9781  
-park_km                  -2.985e-01  7.404e-01  -0.403   0.6916  
-green_zone_km             1.112e+00  2.778e+00   0.400   0.6935  
-industrial_km             1.376e+00  3.996e+00   0.344   0.7346  
-railroad_station_walk_km -7.090e-01  2.066e+00  -0.343   0.7354  
----
-Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
 
-Residual standard error: 0.327 on 18 degrees of freedom
-Multiple R-squared:  0.7698,	Adjusted R-squared:  0.5395 
-F-statistic: 3.343 on 18 and 18 DF,  p-value: 0.007043
+#Feature Engineering
+moddata["building_age"] = 2020 - moddata$build_year
+moddata["diff_floor"] = moddata$max_floor-moddata$floor
+
+#One Hot Encoding for Invetment Categorical Variable
+newdata <- one_hot(as.data.table(moddata$product_type))
+moddata["V1_Investment"] = newdata$V1_Investment
+moddata["V1_OwnerOccupier"] = newdata$V1_OwnerOccupier
+
+#Data Partision
+set.seed(100) 
+index = sample(1:nrow(moddata), 0.7*nrow(moddata)) 
+
+train = moddata[index,] # Create the training data 
+test = moddata[-index,] # Create the test data
+
+dim(train)
+dim(test)
+
+#OLS Model with StepWise
+OLS_model = step(
+            lm(price_doc~
+                  timestamp+
+                  V1_Investment+V1_OwnerOccupier+
+            
+                  full_sq+floor+hospital_beds_raion+life_sq+num_room+max_floor+raion_popul+
+                  kitch_sq+preschool_quota+
+                  healthcare_centers_raion+university_top_20_raion+shopping_centers_raion+
+                  metro_km_walk+
+                  healthcare_centers_raion+university_top_20_raion+shopping_centers_raion+
+                 
+                  build_count_block+build_count_wood+build_count_frame+build_count_brick+
+                 
+                  build_count_before_1920+
+                 
+                  kremlin_km+big_road1_km+big_road2_km+railroad_km+bus_terminal_avto_km+big_market_km+market_shop_km+
+                  
+                  office_raion+railroad_terminal_raion+
+                  railroad_station_avto_min+public_transport_station_km+ice_rink_km+
+                  swim_pool_km+fitness_km+university_km+
+               
+                  X7_14_all+X0_17_all+X16_29_all+X0_13_all
+               
+               
+                , data = train), direction="forward")
+summary(OLS_model)
+
+#Function to evaluate metrics
+eval_metrics = function(model, df, predictions, target){
+    resids = df[,target] - predictions
+    resids2 = resids**2
+    N = length(predictions)
+    r2 = as.character(round(summary(model)$r.squared, 2))
+    adj_r2 = as.character(round(summary(model)$adj.r.squared, 2))
+    print(adj_r2) #Adjusted R-squared
+    print(as.character(round(sqrt(sum(resids2)/N), 2))) #RMSE
+}
+
+
+#predicting and evaluating the model on train data
+predictions = predict(OLS_model, newdata = train)
+eval_metrics(OLS_model, train, predictions, target = 'price_doc')
+
+#predicting and evaluating the model on test data
+predictions = predict(OLS_model, newdata = test)
+eval_metrics(OLS_model, test, predictions, target = 'price_doc')
+
+a = colnames(moddata)
+a
+
+str(moddata)
+
+###**Removed Features ####
+#school_km+park_km
+#children_school
+#material+full_all
+#build_year
+#full_all+X0_6_all
+#+green_zone_part
+#+stadium_km+basketball_km+big_church_km+workplaces_km
+#big_market_raion
+#build_count_1921.1945+build_count_1946.1970+build_count_1971.1995+build_count_after_1995+
+
+
+ggplot(moddata, aes(price, full_sq+floor)) +
+  geom_point() +
+  stat_smooth(method = lm)
+
+df_numeric$price_doc
+
+confint(model)
+
+##LASSO Regression (Second regresstion method)
+lambdas <- 10^seq(2, -3, by = -.1)
+lasso_reg = glmnet(x=df_numeric, y=df_numeric$price_doc, alpha = 1, lambda = lambdas, standardize = TRUE)
+
+##Random Forest
+rf_classifier = randomForest(log_price_doc~full_sq+children_school, 
+                             data=df_numeric, ntree=10, mtry=1, importance=TRUE)
+summary(rf_classifier)
+
+# Best 
+lambda_best <- lasso_reg$lambda.min 
+lambda_best
+
 
 ```
+
+
 
 
 
