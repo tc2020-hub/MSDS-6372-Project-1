@@ -150,6 +150,30 @@ corrplot(cor(df_corr), diag = FALSE, order = "FPC",
 ```{r Assumptions, echo=FALSE}
 # Homoscedasticity, normal distributions of the response for fixed values of the explanatory variable(s), linear relationship between the mean of the response and each explanatory variable, etc.  This is where you would apply transformations (log, square root, etc.)
 
+histogram(moddata$price_doc)
+moddata["log_price_doc"] = log(moddata$price_doc,10)
+histogram(moddata$log_price_doc)
+
+##Function to remove outliers
+remove_outliers <- function(x, na.rm = TRUE, ...) {
+  qnt <- quantile(x, probs=c(.25, .75), na.rm = na.rm, ...)
+  H <- 1.5 * IQR(x, na.rm = na.rm)
+  y <- x
+  y[x < (qnt[1] - H)] <- NA
+  y[x > (qnt[2] + H)] <- NA
+  y
+}
+
+#Testing outliers
+boxplot(moddata$num_room)
+boxplot(moddata$max_floor)
+boxplot(moddata$full_sq)
+boxplot(moddata$full_sq)
+
+moddata$max_floor <- remove_outliers(moddata$max_floor)
+moddata$full_sq <- remove_outliers(moddata$full_sq)
+
+
 ```
 
 ```{r Variable Selection, echo=FALSE}
@@ -187,7 +211,7 @@ dim(test)
 
 #OLS Model with StepWise
 OLS_model = step(
-            lm(price_doc~
+            lm(log_price_doc~
                   timestamp+
                   V1_Investment+V1_OwnerOccupier+
             
@@ -213,6 +237,8 @@ OLS_model = step(
                 , data = train), direction="forward")
 summary(OLS_model)
 
+summary(moddata$price_doc)
+
 #Function to evaluate metrics
 eval_metrics = function(model, df, predictions, target){
     resids = df[,target] - predictions
@@ -227,11 +253,11 @@ eval_metrics = function(model, df, predictions, target){
 
 #predicting and evaluating the model on train data
 predictions = predict(OLS_model, newdata = train)
-eval_metrics(OLS_model, train, predictions, target = 'price_doc')
+eval_metrics(OLS_model, train, predictions, target = 'log_price_doc')
 
 #predicting and evaluating the model on test data
 predictions = predict(OLS_model, newdata = test)
-eval_metrics(OLS_model, test, predictions, target = 'price_doc')
+eval_metrics(OLS_model, test, predictions, target = 'log_price_doc')
 
 a = colnames(moddata)
 a
@@ -249,14 +275,6 @@ str(moddata)
 #big_market_raion
 #build_count_1921.1945+build_count_1946.1970+build_count_1971.1995+build_count_after_1995+
 
-
-ggplot(moddata, aes(price, full_sq+floor)) +
-  geom_point() +
-  stat_smooth(method = lm)
-
-df_numeric$price_doc
-
-confint(model)
 
 ##LASSO Regression (Second regresstion method)
 lambdas <- 10^seq(2, -3, by = -.1)
