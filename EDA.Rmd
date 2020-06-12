@@ -12,8 +12,14 @@ knitr::opts_chunk$set(echo = TRUE)
 ```{r Package Mang, echo=FALSE}
 # Install/Import Packages
 install.packages("naniar")
+install.packages("corrplot")
+install.packages("funModeling")
+install.packages("tidyverse")
+install.packages("Hmisc")
+install.packages("mice")
 install.packages("glmnet")
 install.packages("mltools")
+
 
 library(naniar)
 library(ggplot2)
@@ -23,13 +29,12 @@ library(caret)
 library(funModeling)
 library(tidyverse) 
 library(Hmisc)
+library(mice)
 library(randomForest)
 library(glmnet)
-
 library(data.table)
 library(Matrix)
 library(caret)
-
 library(mltools)
 
 ```
@@ -38,12 +43,29 @@ library(mltools)
 # Import Data Sets
 moddata = read.csv("modelingData.csv", header = TRUE)
 projdata = read.csv("projectionData.csv", header = TRUE)
+
+# Identify Structure and Stats
+summary(moddata)
+str(moddata)
+summary(projdata)
+str(projdata)
 ```
 
 Data Cleaning and Wrangling
 
 ```{r Data Wrangling, echo=FALSE}
 # Data Cleaning / Wrangling (any renaming of variables or standardizing of values.)
+moddata_imp = mice(moddata, m=5, maxit=5, method='cart', seed = 500)
+moddata_imp2 <- complete(moddata_imp, "long", inc = TRUE)
+
+projdata_imp = mice(moddata, m=5, maxit=5, method='cart', seed = 500)
+projdata_imp2 = complete(projdata_imp, "long", inc = TRUE)
+
+train_df = moddata_imp2 %>% filter(.imp == 5)
+test_df = projdata_imp2 %>% filter(.imp == 5)
+
+train_df <- na.omit(train_df)
+test_df <- na.omit(test_df)
 
 ```
 
@@ -52,6 +74,28 @@ Exploratory Data Analysis
 ```{r Outlier, echo=FALSE}
 # Outlier Identification and Handling
 
+# Function to Cap the Outliers using IQR
+outlierTreament<-function(x){
+  qnt <- quantile(x, probs=c(.25, .75), na.rm = T)
+  caps <- quantile(x, probs=c(.05, .95), na.rm = T)
+  H <- 1.5 * IQR(x, na.rm = T)
+  x[x < (qnt[1] - H)] <- caps[1]
+  x[x > (qnt[2] + H)] <- caps[2]
+  return(x)}
+
+# Remove String Columns 
+numeric_cols<-test_df[sapply(test_df, is.numeric)]
+numeric_data<-test_df[,test_df%in%numeric_cols]
+
+numeric_cols2<-train_df[sapply(train_df, is.numeric)]
+numeric_data2<-train_df[,train_df%in%numeric_cols]
+
+# Apply IQR Functions to DBs
+test_df_IQR<-as.data.frame(sapply(numeric_data,outlierTreament))
+train_df_IQR<-as.data.frame(sapply(numeric_data2,outlierTreament))
+
+summary(test_df_IQR)
+summary(train_df_IQR)
 ```
 
 ```{r Miss Value, echo=FALSE}
