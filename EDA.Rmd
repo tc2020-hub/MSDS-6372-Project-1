@@ -55,6 +55,8 @@ Data Cleaning and Wrangling
 
 ```{r Data Wrangling, echo=FALSE}
 # Data Cleaning / Wrangling (any renaming of variables or standardizing of values.)
+
+# Impute Missing Values
 moddata_imp = mice(moddata, m=5, maxit=5, method='cart', seed = 500)
 moddata_imp2 <- complete(moddata_imp, "long", inc = TRUE)
 
@@ -90,7 +92,7 @@ numeric_data<-test_df[,test_df%in%numeric_cols]
 numeric_cols2<-train_df[sapply(train_df, is.numeric)]
 numeric_data2<-train_df[,train_df%in%numeric_cols]
 
-# Apply IQR Functions to DBs
+# Apply Outlier/IQR Functions to DBs
 test_df_IQR<-as.data.frame(sapply(numeric_data,outlierTreament))
 train_df_IQR<-as.data.frame(sapply(numeric_data2,outlierTreament))
 
@@ -102,22 +104,10 @@ summary(train_df_IQR)
 # Missing value identification, summary and possible imputation (mean, median, regression.) This may also be considered part of “Data Wrangling”.
 
 #Create plots to analyize missing data
-gg_miss_var(moddata)
-vis_miss(moddata, warn_large_data = FALSE)
-gg_miss_var(projdata)
-vis_miss(projdata, warn_large_data = FALSE)
-```
-
-```{r}
-
-############################################
-#Address missing values in each column
-############################################
-#missing values
-# create new dataset without missing data
-moddata <- na.omit(moddata)
-
-
+gg_miss_var(train_df_IQR)
+vis_miss(train_df_IQR, warn_large_data = FALSE)
+gg_miss_var(train_df_IQR)
+vis_miss(train_df_IQR, warn_large_data = FALSE)
 ```
 
 ```{r}
@@ -138,12 +128,12 @@ ggplot(prodCount, aes(x = product_type, y = counts)) +
   theme_grey()
 
 #PLot Price_doc vs full_sq
-ggplot(aes(x=full_sq, y=price_doc), data=moddata) + 
+ggplot(aes(x=full_sq, y=price_doc), data=train_df_IQR) + 
     geom_point(color='blue')
 
 
 # % of missed data by features
-miss_pct <- map_dbl(moddata, function(x) { round((sum(is.na(x)) / length(x)) * 100, 1) })
+miss_pct <- map_dbl(train_df_IQR, function(x) { round((sum(is.na(x)) / length(x)) * 100, 1) })
 miss_pct <- miss_pct[miss_pct > 0]
 data.frame(miss=miss_pct, var=names(miss_pct), row.names=NULL) %>%
     ggplot(aes(x=reorder(var, -miss), y=miss)) + 
@@ -152,13 +142,13 @@ data.frame(miss=miss_pct, var=names(miss_pct), row.names=NULL) %>%
     theme(axis.text.x=element_text(angle=90, hjust=1))
 
 # Histogram showing build year distribution
-moddata %>% 
+train_df_IQR %>% 
     filter(build_year > 1940 & build_year < 2018) %>%
     ggplot(aes(x=build_year)) + 
     geom_histogram(fill='blue') + 
     ggtitle('Distribution of build year')
 
-table(moddata$build_year)
+table(train_df_IQR$build_year)
 
 # Date features
 ts1 = as.Date(timestamp)
@@ -171,7 +161,7 @@ data[,":="(date_yday=yday(timestamp)
 )]
 
 
-str(moddata) 
+str(train_df_IQR) 
 
 ```
 
@@ -179,14 +169,15 @@ str(moddata)
 # Multicollinearity (is there reason to believe it is present?)  You don’t have to address every potential pair of variables that may be collinear.  Just provide a plot and or other evidence of a single occurrence of multicollinearity if at least one exists and then mention possible other occurrences.  
 
 #Return numeric values only
-df_numeric <- moddata[, sapply(moddata, is.numeric)]
+df_numeric <- train_df_IQR[, sapply(train_df_IQR, is.numeric)]
 
 #Correlation Plot
+df_numeric <-select(train_df_IQR, -.imp)
 df_numeric[is.na(df_numeric)] <- "0"
 df_numeric <- df_numeric[, sapply(df_numeric, is.numeric)]
 df_corr <- round(cor(df_numeric),2)
 
-corrplot(cor(df_corr), diag = FALSE, order = "FPC",
+corrplot(cor(df_numeric), diag = FALSE, order = "FPC",
          tl.pos = "td", tl.cex = 0.5, method = "color", type = "upper")
 
 ```
@@ -194,29 +185,15 @@ corrplot(cor(df_corr), diag = FALSE, order = "FPC",
 ```{r Assumptions, echo=FALSE}
 # Homoscedasticity, normal distributions of the response for fixed values of the explanatory variable(s), linear relationship between the mean of the response and each explanatory variable, etc.  This is where you would apply transformations (log, square root, etc.)
 
-histogram(moddata$price_doc)
-moddata["log_price_doc"] = log(moddata$price_doc,10)
-histogram(moddata$log_price_doc)
-
-##Function to remove outliers
-remove_outliers <- function(x, na.rm = TRUE, ...) {
-  qnt <- quantile(x, probs=c(.25, .75), na.rm = na.rm, ...)
-  H <- 1.5 * IQR(x, na.rm = na.rm)
-  y <- x
-  y[x < (qnt[1] - H)] <- NA
-  y[x > (qnt[2] + H)] <- NA
-  y
-}
+histogram(train_df_IQR$price_doc)
+train_df_IQR["log_price_doc"] = log(train_df_IQR$price_doc,10)
+histogram(train_df_IQR$log_price_doc)
 
 #Testing outliers
-boxplot(moddata$num_room)
-boxplot(moddata$max_floor)
-boxplot(moddata$full_sq)
-boxplot(moddata$full_sq)
-
-moddata$max_floor <- remove_outliers(moddata$max_floor)
-moddata$full_sq <- remove_outliers(moddata$full_sq)
-
+boxplot(train_df_IQR$num_room)
+boxplot(train_df_IQR$max_floor)
+boxplot(train_df_IQR$full_sq)
+boxplot(train_df_IQR$full_sq)
 
 ```
 
@@ -233,22 +210,21 @@ moddata$full_sq <- remove_outliers(moddata$full_sq)
 ```{r Model building, echo=FALSE}
 # Model using Stepwise Elimination Process)
 
-
 #Feature Engineering
-moddata["building_age"] = 2020 - moddata$build_year
-moddata["diff_floor"] = moddata$max_floor-moddata$floor
+train_df_IQR["building_age"] = 2020 - train_df_IQR$build_year
+train_df_IQR["diff_floor"] = train_df_IQR$max_floor-train_df_IQR$floor
 
 #One Hot Encoding for Invetment Categorical Variable
-newdata <- one_hot(as.data.table(moddata$product_type))
-moddata["V1_Investment"] = newdata$V1_Investment
-moddata["V1_OwnerOccupier"] = newdata$V1_OwnerOccupier
+#newdata <- one_hot(as.data.table(moddata$product_type))
+#train_df_IQR["V1_Investment"] = newdata$V1_Investment
+#train_df_IQR["V1_OwnerOccupier"] = newdata$V1_OwnerOccupier
 
 #Data Partision
 set.seed(100) 
-index = sample(1:nrow(moddata), 0.7*nrow(moddata)) 
+index = sample(1:nrow(train_df_IQR), 0.7*nrow(train_df_IQR)) 
 
-train = moddata[index,] # Create the training data 
-test = moddata[-index,] # Create the test data
+train = train_df_IQR[index,] # Create the training data 
+test = train_df_IQR[-index,] # Create the test data
 
 dim(train)
 dim(test)
@@ -257,7 +233,6 @@ dim(test)
 OLS_model = step(
             lm(log_price_doc~
                   timestamp+
-                  V1_Investment+V1_OwnerOccupier+
             
                   full_sq+floor+hospital_beds_raion+life_sq+num_room+max_floor+raion_popul+
                   kitch_sq+preschool_quota+
@@ -271,7 +246,7 @@ OLS_model = step(
                  
                   kremlin_km+big_road1_km+big_road2_km+railroad_km+bus_terminal_avto_km+big_market_km+market_shop_km+
                   
-                  office_raion+railroad_terminal_raion+
+                  office_raion+
                   railroad_station_avto_min+public_transport_station_km+ice_rink_km+
                   swim_pool_km+fitness_km+university_km+
                
@@ -279,9 +254,8 @@ OLS_model = step(
                
                
                 , data = train), direction="forward")
-summary(OLS_model)
 
-summary(moddata$price_doc)
+summary(OLS_model)
 
 #Function to evaluate metrics
 eval_metrics = function(model, df, predictions, target){
