@@ -17,6 +17,9 @@ install.packages("funModeling")
 install.packages("tidyverse")
 install.packages("Hmisc")
 install.packages("mice")
+install.packages("glmnet")
+install.packages("mltools")
+
 
 library(naniar)
 library(ggplot2)
@@ -27,6 +30,12 @@ library(funModeling)
 library(tidyverse) 
 library(Hmisc)
 library(mice)
+library(randomForest)
+library(glmnet)
+library(data.table)
+library(Matrix)
+library(caret)
+library(mltools)
 
 ```
 
@@ -102,6 +111,18 @@ vis_miss(projdata, warn_large_data = FALSE)
 ```{r}
 
 ############################################
+#Address missing values in each column
+############################################
+#missing values
+# create new dataset without missing data
+moddata <- na.omit(moddata)
+
+
+```
+
+```{r}
+
+############################################
 #basic plots to analyize data
 ############################################
 
@@ -120,10 +141,6 @@ ggplot(prodCount, aes(x = product_type, y = counts)) +
 ggplot(aes(x=full_sq, y=price_doc), data=moddata) + 
     geom_point(color='blue')
 
-# price_doc is right skwed we can 
-ggplot(moddata,aes(x=price_doc))+geom_density(fill="blue",alpha=0.6)
-moddata['log_price_doc'] = log(moddata$price_doc)
-ggplot(moddata,aes(x=log_price_doc))+geom_density(fill="blue",alpha=0.6)
 
 # % of missed data by features
 miss_pct <- map_dbl(moddata, function(x) { round((sum(is.na(x)) / length(x)) * 100, 1) })
@@ -142,6 +159,16 @@ moddata %>%
     ggtitle('Distribution of build year')
 
 table(moddata$build_year)
+
+# Date features
+ts1 = as.Date(timestamp)
+data[,":="(date_yday=yday(timestamp)
+           ,date_month=month(timestamp)
+           ,date_year=year(timestamp)
+           ,date_week=week(timestamp)
+           ,date_mday=mday(timestamp)
+           ,date_wday=wday(timestamp)
+)]
 
 
 str(moddata) 
@@ -167,6 +194,30 @@ corrplot(cor(df_corr), diag = FALSE, order = "FPC",
 ```{r Assumptions, echo=FALSE}
 # Homoscedasticity, normal distributions of the response for fixed values of the explanatory variable(s), linear relationship between the mean of the response and each explanatory variable, etc.  This is where you would apply transformations (log, square root, etc.)
 
+histogram(moddata$price_doc)
+moddata["log_price_doc"] = log(moddata$price_doc,10)
+histogram(moddata$log_price_doc)
+
+##Function to remove outliers
+remove_outliers <- function(x, na.rm = TRUE, ...) {
+  qnt <- quantile(x, probs=c(.25, .75), na.rm = na.rm, ...)
+  H <- 1.5 * IQR(x, na.rm = na.rm)
+  y <- x
+  y[x < (qnt[1] - H)] <- NA
+  y[x > (qnt[2] + H)] <- NA
+  y
+}
+
+#Testing outliers
+boxplot(moddata$num_room)
+boxplot(moddata$max_floor)
+boxplot(moddata$full_sq)
+boxplot(moddata$full_sq)
+
+moddata$max_floor <- remove_outliers(moddata$max_floor)
+moddata$full_sq <- remove_outliers(moddata$full_sq)
+
+
 ```
 
 ```{r Variable Selection, echo=FALSE}
@@ -176,6 +227,112 @@ corrplot(cor(df_corr), diag = FALSE, order = "FPC",
 
 ```{r Miscellaneous, echo=FALSE}
 # Anything else that might be appropriate in learning about the data before getting started.  (Example: You might analyze interactions between explanatory variables in the analysis.)
+
+```
+
+```{r Model building, echo=FALSE}
+# Model using Stepwise Elimination Process)
+
+
+#Feature Engineering
+moddata["building_age"] = 2020 - moddata$build_year
+moddata["diff_floor"] = moddata$max_floor-moddata$floor
+
+#One Hot Encoding for Invetment Categorical Variable
+newdata <- one_hot(as.data.table(moddata$product_type))
+moddata["V1_Investment"] = newdata$V1_Investment
+moddata["V1_OwnerOccupier"] = newdata$V1_OwnerOccupier
+
+#Data Partision
+set.seed(100) 
+index = sample(1:nrow(moddata), 0.7*nrow(moddata)) 
+
+train = moddata[index,] # Create the training data 
+test = moddata[-index,] # Create the test data
+
+dim(train)
+dim(test)
+
+#OLS Model with StepWise
+OLS_model = step(
+            lm(log_price_doc~
+                  timestamp+
+                  V1_Investment+V1_OwnerOccupier+
+            
+                  full_sq+floor+hospital_beds_raion+life_sq+num_room+max_floor+raion_popul+
+                  kitch_sq+preschool_quota+
+                  healthcare_centers_raion+university_top_20_raion+shopping_centers_raion+
+                  metro_km_walk+
+                  healthcare_centers_raion+university_top_20_raion+shopping_centers_raion+
+                 
+                  build_count_block+build_count_wood+build_count_frame+build_count_brick+
+                 
+                  build_count_before_1920+
+                 
+                  kremlin_km+big_road1_km+big_road2_km+railroad_km+bus_terminal_avto_km+big_market_km+market_shop_km+
+                  
+                  office_raion+railroad_terminal_raion+
+                  railroad_station_avto_min+public_transport_station_km+ice_rink_km+
+                  swim_pool_km+fitness_km+university_km+
+               
+                  X7_14_all+X0_17_all+X16_29_all+X0_13_all
+               
+               
+                , data = train), direction="forward")
+summary(OLS_model)
+
+summary(moddata$price_doc)
+
+#Function to evaluate metrics
+eval_metrics = function(model, df, predictions, target){
+    resids = df[,target] - predictions
+    resids2 = resids**2
+    N = length(predictions)
+    r2 = as.character(round(summary(model)$r.squared, 2))
+    adj_r2 = as.character(round(summary(model)$adj.r.squared, 2))
+    print(adj_r2) #Adjusted R-squared
+    print(as.character(round(sqrt(sum(resids2)/N), 2))) #RMSE
+}
+
+
+#predicting and evaluating the model on train data
+predictions = predict(OLS_model, newdata = train)
+eval_metrics(OLS_model, train, predictions, target = 'log_price_doc')
+
+#predicting and evaluating the model on test data
+predictions = predict(OLS_model, newdata = test)
+eval_metrics(OLS_model, test, predictions, target = 'log_price_doc')
+
+a = colnames(moddata)
+a
+
+str(moddata)
+
+###**Removed Features ####
+#school_km+park_km
+#children_school
+#material+full_all
+#build_year
+#full_all+X0_6_all
+#+green_zone_part
+#+stadium_km+basketball_km+big_church_km+workplaces_km
+#big_market_raion
+#build_count_1921.1945+build_count_1946.1970+build_count_1971.1995+build_count_after_1995+
+
+
+##LASSO Regression (Second regresstion method)
+lambdas <- 10^seq(2, -3, by = -.1)
+lasso_reg = glmnet(x=df_numeric, y=df_numeric$price_doc, alpha = 1, lambda = lambdas, standardize = TRUE)
+
+##Random Forest
+rf_classifier = randomForest(log_price_doc~full_sq+children_school, 
+                             data=df_numeric, ntree=10, mtry=1, importance=TRUE)
+summary(rf_classifier)
+
+# Best 
+lambda_best <- lasso_reg$lambda.min 
+lambda_best
+
 
 ```
 
